@@ -25,6 +25,7 @@ jobs:
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.SERVER_SSH_KEY }}
+          known_hosts: unnecessary
 
       - name: Deploy to Linux Server (Zero Downtime)
         run: |
