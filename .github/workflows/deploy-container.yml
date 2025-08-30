@@ -30,8 +30,6 @@ jobs:
       - name: Deploy to Linux Server (Zero Downtime)
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            # Navigate to deployment directory
-            cd /opt/s2t-ipa || { echo "Deployment directory not found"; exit 1; }
             
             # Create external cache directory if it doesn't exist (root will own it)
             sudo mkdir -p /var/cache/s2t/ipa
@@ -40,8 +38,8 @@ jobs:
             echo "🔄 Pulling latest image..."
             sudo podman pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa:${{ inputs.image_tag || 'latest' }}
             
-            # Check if there's a running container
-            CURRENT_CONTAINER=$(sudo podman ps --filter "ancestor=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa" --format "{{.Names}}" | head -1)
+            # Check if there's a running s2t-ipa container (very specific filter)
+            CURRENT_CONTAINER=$(sudo podman ps --filter "ancestor=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa" --filter "name=s2t-ipa" --format "{{.Names}}" | head -1)
             
             # Generate unique container name for new deployment
             NEW_CONTAINER="s2t-ipa-$(date +%s)"
@@ -92,9 +90,9 @@ jobs:
               --health-retries=3 \
               docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa:${{ inputs.image_tag || 'latest' }}
             
-            # Stop old container after new one is running
-            if [ ! -z "$CURRENT_CONTAINER" ] && [ "$CURRENT_CONTAINER" != "s2t-ipa-current" ]; then
-              echo "🛑 Stopping old container: $CURRENT_CONTAINER"
+            # Stop old s2t-ipa container after new one is running (only if it matches our naming pattern)
+            if [ ! -z "$CURRENT_CONTAINER" ] && [ "$CURRENT_CONTAINER" != "s2t-ipa-current" ] && [[ "$CURRENT_CONTAINER" == s2t-ipa* ]]; then
+              echo "🛑 Stopping old s2t-ipa container: $CURRENT_CONTAINER"
               sudo podman stop "$CURRENT_CONTAINER" || true
               sudo podman rm "$CURRENT_CONTAINER" || true
             fi
@@ -110,8 +108,8 @@ jobs:
               exit 1
             fi
             
-            # Cleanup old images (keep last 2 versions)
-            echo "🧹 Cleaning up old images..."
+            # Cleanup only s2t-ipa images (keep last 2 versions, very specific filter)
+            echo "🧹 Cleaning up old s2t-ipa images..."
             sudo podman images docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa --format "{{.ID}}" | tail -n +3 | xargs -r sudo podman rmi || true
           EOF
 
