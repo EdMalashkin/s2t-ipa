@@ -1,0 +1,24 @@
+# Development files
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Git
+.git/
+.gitignore
+
+# CI/CD (not needed in container)
+.github/
+
+# Docker files (not needed in container)
+docker/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

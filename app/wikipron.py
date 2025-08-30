@@ -23,8 +23,10 @@ class Wikipron:
             print(f"Warning: No configuration found for language code '{self.lang_code_2digit}'. Using fallback.")
             # For unmapped languages, we'll still try to work with basic patterns
         
-        self.cache_dir = Path("cache/wikipron")
+        # Configure cache directory - use mounted cache directly
+        self.cache_dir = Path("cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
         self.base_url = "https://raw.githubusercontent.com/CUNY-CL/wikipron/master/data/scrape/tsv"
         
         # Simple unified caching - store final formatted IPA strings

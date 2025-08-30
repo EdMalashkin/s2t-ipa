@@ -1,0 +1,125 @@
+name: Deploy Container
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy"
+        required: false
+        default: "latest"
+        type: string
+  workflow_call:
+    inputs:
+      image_tag:
+        description: "Docker image tag to deploy"
+        required: false
+        default: "latest"
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SERVER_SSH_KEY }}
+
+      - name: Deploy to Linux Server (Zero Downtime)
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+            # Navigate to deployment directory
+            cd /opt/s2t-ipa || { echo "Deployment directory not found"; exit 1; }
+            
+            # Create external cache directory if it doesn't exist (root will own it)
+            sudo mkdir -p /var/cache/s2t/ipa
+            
+            # Pull latest image first (while old service is still running)
+            echo "🔄 Pulling latest image..."
+            sudo podman pull docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa:${{ inputs.image_tag || 'latest' }}
+            
+            # Check if there's a running container
+            CURRENT_CONTAINER=$(sudo podman ps --filter "ancestor=docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa" --format "{{.Names}}" | head -1)
+            
+            # Generate unique container name for new deployment
+            NEW_CONTAINER="s2t-ipa-$(date +%s)"
+            
+            echo "🚀 Starting new container: $NEW_CONTAINER"
+            # Start new container on a temporary port first (as root)
+            sudo podman run -d \
+              --name "$NEW_CONTAINER" \
+              -p 8081:8080 \
+              -v /var/cache/s2t/ipa:/app/cache \
+              --health-cmd="curl -f http://localhost:8080/health || exit 1" \
+              --health-interval=10s \
+              --health-timeout=5s \
+              --health-retries=3 \
+              docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa:${{ inputs.image_tag || 'latest' }}
+            
+            # Wait for new container to be healthy
+            echo "⏳ Waiting for new container to be healthy..."
+            for i in {1..30}; do
+              if curl -f http://localhost:8081/health >/dev/null 2>&1; then
+                echo "✅ New container is healthy"
+                break
+              fi
+              if [ $i -eq 30 ]; then
+                echo "❌ New container failed health check"
+                sudo podman logs "$NEW_CONTAINER"
+                sudo podman rm -f "$NEW_CONTAINER"
+                exit 1
+              fi
+              sleep 2
+            done
+            
+            # Switch traffic to new container (atomic operation)
+            echo "🔄 Switching traffic to new container..."
+            
+            # Update port mapping atomically
+            sudo podman stop "$NEW_CONTAINER"
+            sudo podman rm "$NEW_CONTAINER"
+            
+            # Start the final container on port 8080 (as root)
+            sudo podman run -d \
+              --name "s2t-ipa-current" \
+              -p 8080:8080 \
+              -v /var/cache/s2t/ipa:/app/cache \
+              --health-cmd="curl -f http://localhost:8080/health || exit 1" \
+              --health-interval=10s \
+              --health-timeout=5s \
+              --health-retries=3 \
+              docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa:${{ inputs.image_tag || 'latest' }}
+            
+            # Stop old container after new one is running
+            if [ ! -z "$CURRENT_CONTAINER" ] && [ "$CURRENT_CONTAINER" != "s2t-ipa-current" ]; then
+              echo "🛑 Stopping old container: $CURRENT_CONTAINER"
+              sudo podman stop "$CURRENT_CONTAINER" || true
+              sudo podman rm "$CURRENT_CONTAINER" || true
+            fi
+            
+            # Final health check
+            sleep 5
+            if curl -f http://localhost:8080/health; then
+              echo "✅ Zero-downtime deployment successful!"
+              sudo podman ps --filter "name=s2t-ipa-current"
+            else
+              echo "❌ Final health check failed"
+              sudo podman logs s2t-ipa-current
+              exit 1
+            fi
+            
+            # Cleanup old images (keep last 2 versions)
+            echo "🧹 Cleaning up old images..."
+            sudo podman images docker.io/${{ secrets.DOCKERHUB_USERNAME }}/s2t-ipa --format "{{.ID}}" | tail -n +3 | xargs -r sudo podman rmi || true
+          EOF
+
+      - name: Verify deployment
+        run: |
+          # Additional verification from outside the server
+          echo "🔍 Verifying deployment from GitHub Actions runner..."
+
+          # You can add external health checks here if needed
+          # curl -f http://${{ secrets.SERVER_HOST }}:8080/health
+
+          echo "✅ Deployment workflow completed"

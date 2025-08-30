@@ -174,3 +174,7 @@ test_data.json
 *test_results*.json
 *.log
 *.tmp
+
+# Docker
+.dockerignore.bak
+docker-compose.override.yml

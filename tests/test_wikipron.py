@@ -26,7 +26,7 @@ class TestWikipron:
         wikipron = Wikipron(self.test_lang)
         
         assert wikipron.lang_code_2digit == "en"
-        assert wikipron.cache_dir == Path("cache/wikipron")
+        assert wikipron.cache_dir == Path("cache")
         assert wikipron.base_url == "https://raw.githubusercontent.com/CUNY-CL/wikipron/master/data/scrape/tsv"
         assert wikipron._word_cache == {}
         assert wikipron._loaded_patterns == []

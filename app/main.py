@@ -14,6 +14,11 @@ async def root():
     """Root endpoint"""
     return {"message": "IPA Transcription API", "status": "running"}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker"""
+    return {"status": "healthy", "service": "s2t-ipa"}
+
 @app.post("/ipa")
 async def add_ipa(
     request: Request,
