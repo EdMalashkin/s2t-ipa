@@ -14,6 +14,15 @@ class JsonIPA:
         # Cache for IPA lookups to avoid duplicate processing
         self._ipa_cache = {}
     
+    @staticmethod
+    def clean_all_cache() -> Dict[str, Any]:
+        """
+        Clean all cached Wikipron TSV files to free up disk space
+        
+        Returns: Dictionary with cleanup statistics
+        """
+        return Wikipron.clean_all_cache()
+    
     def _get_ipa_for_text(self, text: str) -> str:
         """Get IPA transcription for any text using Wikipron"""
         # Use the class-level Wikipron instance

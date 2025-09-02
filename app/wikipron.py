@@ -3,6 +3,7 @@ import urllib.request
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 from functools import lru_cache
+import shutil
 from .wikipron_config import get_language_config, get_filename_patterns, get_variety_labels
 
 
@@ -32,6 +33,74 @@ class Wikipron:
         # Simple unified caching - store final formatted IPA strings
         self._word_cache: Dict[str, str] = {}
         self._loaded_patterns: List[str] = []  # Track which files we've loaded
+
+    @classmethod
+    def clean_all_cache(cls) -> Dict[str, any]:
+        """
+        Clean all cached files from the cache directory
+        Returns: Dictionary with cleanup statistics
+        """
+        cache_dir = Path("cache")
+        
+        if not cache_dir.exists():
+            return {
+                "success": True,
+                "message": "Cache directory does not exist",
+                "files_removed": 0,
+                "space_freed_bytes": 0,
+                "space_freed_formatted": "0 bytes"
+            }
+        
+        try:
+            # Count files and calculate total size before deletion
+            files_removed = 0
+            total_size = 0
+            
+            for file_path in cache_dir.rglob("*"):
+                if file_path.is_file():
+                    try:
+                        total_size += file_path.stat().st_size
+                        files_removed += 1
+                    except OSError:
+                        # Handle cases where file might be deleted during iteration
+                        pass
+            
+            # Remove all cache contents
+            if cache_dir.exists():
+                shutil.rmtree(cache_dir)
+                cache_dir.mkdir(exist_ok=True)  # Recreate empty cache directory
+            
+            # Format size for human readability
+            def format_bytes(bytes_size):
+                if bytes_size == 0:
+                    return "0 bytes"
+                for unit in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+                    if bytes_size < 1024.0:
+                        return f"{bytes_size:.1f} {unit}"
+                    bytes_size /= 1024.0
+                return f"{bytes_size:.1f} PB"
+            
+            return {
+                "success": True,
+                "message": "Cache cleaned successfully",
+                "files_removed": files_removed,
+                "space_freed_bytes": total_size,
+                "space_freed_formatted": format_bytes(total_size)
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to clean cache: {str(e)}",
+                "files_removed": 0,
+                "space_freed_bytes": 0,
+                "space_freed_formatted": "0 bytes"
+            }
+
+    def clear_memory_cache(self) -> None:
+        """Clear the in-memory word cache for this instance"""
+        self._word_cache.clear()
+        self._loaded_patterns.clear()
     
     def _clean_ipa(self, ipa: str) -> str:
         """Remove extra spaces from IPA transcription"""

@@ -33,6 +33,25 @@ async def add_ipa(
     except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 
+@app.delete("/cache")
+async def clean_cache():
+    """Clean all cached files to free up disk space"""
+    try:
+        result = JsonIPA.clean_all_cache()
+        
+        if result["success"]:
+            return {
+                "message": result["message"],
+                "cleaned": True,
+                "files_removed": result["files_removed"],
+                "space_freed": result["space_freed_formatted"]
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result["message"])
+            
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"Failed to clean cache: {str(err)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
