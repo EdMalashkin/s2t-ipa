@@ -217,17 +217,17 @@ class Wikipron:
             if variety_ipas:
                 if len(variety_ipas) == 1:
                     # Single variety available
-                    self._word_cache[word] = f"/{variety_ipas[0][1]}/"
+                    self._word_cache[word] = f"[{variety_ipas[0][1]}]"
                 else:
-                    # Multiple varieties - format as /variety1 // variety2 // variety3/
+                    # Multiple varieties - format as [variety1 / variety2 / variety3]
                     ipa_parts = [ipa for label, ipa in variety_ipas]
                     if len(set(ipa_parts)) == 1:
                         # All varieties have same pronunciation
-                        self._word_cache[word] = f"/{ipa_parts[0]}/"
+                        self._word_cache[word] = f"[{ipa_parts[0]}]"
                     else:
                         # Different pronunciations
-                        formatted_parts = "//".join(ipa_parts)
-                        self._word_cache[word] = f"/{formatted_parts}/"
+                        formatted_parts = " / ".join(ipa_parts)
+                        self._word_cache[word] = f"[{formatted_parts}]"
     
     def _load_single_variety_datasets(self, patterns: List[str]) -> None:
         """Load datasets for languages with single variety"""
@@ -250,7 +250,7 @@ class Wikipron:
                             clean_ipa = self._clean_ipa(ipa)
                             # Only add if not already present (first pattern wins)
                             if word.lower() not in self._word_cache:
-                                self._word_cache[word.lower()] = f"/{clean_ipa}/"
+                                self._word_cache[word.lower()] = f"[{clean_ipa}]"
                 
                 print(f"Loaded {len(self._word_cache)} words from {pattern}")
                 break  # Use first available pattern
