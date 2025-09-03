@@ -23,20 +23,19 @@ class JsonIPA:
         """
         return Wikipron.clean_all_cache()
     
-    def _get_ipa_for_text(self, text: str) -> str:
-        """Get IPA transcription for any text using Wikipron"""
-        # Use the class-level Wikipron instance
-        ipa_result, error = self.wikipron.get_ipa(text)
+    def _get_ipa_for_text(self, text: str) -> List[str]:
+        """Get IPA transcription varieties for any text using Wikipron"""
+        ipa_varieties, error = self.wikipron.get_ipa(text)
         
         if error:
             # Re-raise error to be caught at the global level
             raise Exception(error)
-        elif ipa_result:
+        elif ipa_varieties:
             # Success - return IPA
-            return ipa_result
+            return ipa_varieties
         else:
-            # Not found - return empty string
-            return ""
+            # Not found - return empty list
+            return []
     
     def _process_tokens_batch(self, tokens: List[Dict[str, Any]], field_name: str) -> List[Dict[str, Any]]:
         """Process a batch of tokens efficiently for any field"""
@@ -48,17 +47,17 @@ class JsonIPA:
         for value in unique_values:
             ipa_results[value] = self._get_ipa_for_text(value)
         
-        # Apply IPA to all tokens, but only if IPA is not empty
+        # Apply IPA to all tokens, but only if IPA array is not empty
         for token in tokens:
             if field_name in token:
-                ipa_value = ipa_results[token[field_name]]
-                if ipa_value:  # Only add IPA field if it's not empty
-                    token["ipa"] = ipa_value
+                ipa_array = ipa_results[token[field_name]]
+                if ipa_array:  # Only add IPA field if array is not empty
+                    token["ipa"] = ipa_array
         
         return tokens
     
     def process_bulc(self) -> Dict[str, Any]:
-        """Process JSON data and add IPA transcription to any specified field in fastest possible way"""
+        """Process JSON data and add IPA transcription to any specified field"""
         try:
             if not isinstance(self.json, list):
                 return {"result": self.json, "ipa_error": None}
@@ -72,7 +71,7 @@ class JsonIPA:
                 if not isinstance(tokens, list):
                     continue
                 
-                # Process tokens in batch for maximum efficiency using the specified field
+                # Process tokens in batch for maximum efficiency
                 item["tokens"] = self._process_tokens_batch(tokens, self.token_field)
             
             return {"result": self.json, "ipa_error": None}
