@@ -56,6 +56,7 @@ class Wikipron:
             files_removed = 0
             total_size = 0
             
+            # Only count and remove files, not the directory itself
             for file_path in cache_dir.rglob("*"):
                 if file_path.is_file():
                     try:
@@ -65,10 +66,22 @@ class Wikipron:
                         # Handle cases where file might be deleted during iteration
                         pass
             
-            # Remove all cache contents
-            if cache_dir.exists():
-                shutil.rmtree(cache_dir)
-                cache_dir.mkdir(exist_ok=True)  # Recreate empty cache directory
+            # Remove only files, not the directory (since it might be mounted)
+            for file_path in cache_dir.rglob("*"):
+                if file_path.is_file():
+                    try:
+                        file_path.unlink()  # Remove individual files
+                    except OSError as e:
+                        print(f"Warning: Could not remove {file_path}: {e}")
+            
+            # Remove empty subdirectories (but keep the main cache directory)
+            for dir_path in sorted(cache_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+                if dir_path.is_dir() and dir_path != cache_dir:
+                    try:
+                        dir_path.rmdir()  # Only removes if empty
+                    except OSError:
+                        # Directory not empty or permission issue, ignore
+                        pass
             
             # Format size for human readability
             def format_bytes(bytes_size):
@@ -82,7 +95,7 @@ class Wikipron:
             
             return {
                 "success": True,
-                "message": "Cache cleaned successfully",
+                "message": "Cache files cleaned successfully",
                 "files_removed": files_removed,
                 "space_freed_bytes": total_size,
                 "space_freed_formatted": format_bytes(total_size)
